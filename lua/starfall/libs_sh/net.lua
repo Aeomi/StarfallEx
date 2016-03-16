@@ -101,6 +101,52 @@ function net_library.send ( target )
 	instance.data.net.started = false
 end
 
+
+--- Blacklist for net messages.
+-- If an item with the same type as the key is found, then it will throw an error.
+-- Key must be exactly as is reported by type( var ) otherwise it won't catch it.
+local blacklist = {
+	[ "VMatrix" ] = true
+}
+
+local function checkTblForBlacklist ( t )
+	for _, v in pairs( t ) do
+		if type( v ) == "table" and not SF.UnwrapObject( v ) then
+			checkTblForBlacklist( v )
+		else
+			local typmeta = getmetatable( v )
+			local typ = type( typmeta ) == "string" and typmeta or type( v )
+			if blacklist[ typ ] then
+				SF.throw( "Item of type " .. typ .. " cannot be sent through a net message", 3 )
+			end
+		end
+	end
+end
+
+--- Writes a table to the net message
+-- @shared
+-- @param t The table to be written. This will be checked for blacklisted types. eg VMatrix.
+function net_library.writeTable ( t )
+	local instance = SF.instance
+	if not instance.data.net.started then SF.throw( "net message not started", 2 ) end
+	
+	SF.CheckType( t, "table" )
+
+	checkTblForBlacklist( t )
+
+	write( instance, "Table", SF.Unsanitize( t ) )
+	return true
+end
+
+--- Reads a table from the net message
+-- @shared
+-- @return The table that was read
+function net_library.readTable ()
+	return SF.Sanitize( net.ReadTable() )
+end
+
+
+
 --- Writes a string to the net message. Null characters will terminate the string.
 -- @shared
 -- @param t The string to be written
